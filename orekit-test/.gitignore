@@ -1,0 +1,6 @@
+/target/
+/orekit-data/
+/Oresium/
+/.metadata/
+/orbita.csv
+/src/main/resources/orekit-data.zip
