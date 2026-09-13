@@ -13,6 +13,9 @@ public final class OrekitConfig {
 
     public static void inicializar() {
 
+    	System.out.println("Directorio de trabajo = "
+    	        + System.getProperty("user.dir"));
+    	
         File orekitData = new File("orekit-data");
 
         if (!orekitData.isDirectory()) {
