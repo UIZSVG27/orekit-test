@@ -44,65 +44,81 @@ public class Ejemplo29PropagacionRealista {
 		KeplerianOrbit orbitaInicial = new KeplerianOrbit(a, e, i, omega, raan, ta, PositionAngleType.TRUE, eme2000,
 				fechaInicial, mu);
 
+		System.out.println("Aceleración kepleriana inicial = " + mu / (a * a) + " m/s²");
+
 //		Tolerancias para el Integrador
 		double[][] tolerancias = NumericalPropagator.tolerances(1.0, // 1.0 Posición de tolerancia en metros
 				orbitaInicial, OrbitType.KEPLERIAN);
-		
+
 //		INTEGRADOR 0.001 Paso mínimo  300 Paso máximo Tolerancias Absolutas  Tolerancias relativas
 		DormandPrince853Integrator integrador = new DormandPrince853Integrator(0.001, 300.0, tolerancias[0],
 				tolerancias[1]);
-		
+
 //		PROPAGADOR --> Va a gestionar la evolución del estado orbital
-		NumericalPropagator propagador =
-		        new NumericalPropagator(integrador); //Definición del Propagador
-		
-		//estadoInicial será la órbita del satélite (dado por orbitaInicial)
-		SpacecraftState estadoInicial =
-		        new SpacecraftState(orbitaInicial);
-		
-		propagador.setInitialState(estadoInicial); //Le pasamos el estadoInicial como dato de la órbita Inicial
-		
-		// |Orbit|--> |SpacecraftState(OrbitaInicial)|-->|NumericalPropagator(DormandPrince853Integrator)| 
-		// EstadoInicial + Integrador             ---> NumericalPropagator --> Estado futuro  
-		//               + + Modelos de Fuerzas  ----\
-		
+		NumericalPropagator propagador = new NumericalPropagator(integrador); // Definición del Propagador
+
+		// estadoInicial será la órbita del satélite (dado por orbitaInicial)
+		SpacecraftState estadoInicial = new SpacecraftState(orbitaInicial);
+
+		propagador.setInitialState(estadoInicial); // Le pasamos el estadoInicial como dato de la órbita Inicial
+
+		// |Orbit|-->
+		// |SpacecraftState(OrbitaInicial)|-->|NumericalPropagator(DormandPrince853Integrator)|
+		// EstadoInicial + Integrador ---> NumericalPropagator --> Estado futuro
+		// + + Modelos de Fuerzas ----\
+
 //		MODELO 1 (.) Atracción Newtoniana
 		NewtonianAttraction gravedadCentral = new NewtonianAttraction(mu);
-		propagador.addForceModel(gravedadCentral); //EstadoInicial + Integrador + ForceModel --> NumericalPropagator
-		
-		
-		
+		propagador.addForceModel(gravedadCentral); // EstadoInicial + Integrador + ForceModel --> NumericalPropagator
+
 		// MODELO 2: campo gravitatorio hasta grado 2
 		Frame itrf = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
 		NormalizedSphericalHarmonicsProvider gravedadJ2 = GravityFieldFactory.getNormalizedProvider(2, 0);
 		HolmesFeatherstoneAttractionModel modeloJ2 = new HolmesFeatherstoneAttractionModel(itrf, gravedadJ2);
 		propagador.addForceModel(modeloJ2);
-		
-		// AHORA propagamos
-		AbsoluteDate fechaFinal = fechaInicial.shiftedBy(3600.0); //Propagamos
 
-		SpacecraftState estadoFinal =
-		        propagador.propagate(fechaFinal); // PROPAGANDO PROPAGANDO PROPAGANDO
-		
+/////////////////////////
+/// // Aceleración perturbadora J2 en el instante inicial
+		double aceleracionJ2 = modeloJ2.acceleration(estadoInicial, new double[] { gravedadJ2.getMu() }).getNorm();
+
+		System.out.println("Aceleración J2 inicial = " + aceleracionJ2 + " m/s²");
+
+		System.out.println("Relación J2 / Kepler = " + aceleracionJ2 / (mu / (a * a)));
+
+		// Precesión secular del RAAN debida a J2
+		double J2 = 1.08263e-3;
+		double radioTierra = Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
+
+		double p = a * (1.0 - e * e);
+		double n = Math.sqrt(mu / (a * a * a));
+
+		double omegaPunto = -1.5 * n * J2 * Math.pow(radioTierra / p, 2) * Math.cos(i);
+
+		double variacionRAAN = Math.toDegrees(omegaPunto * 3600.0);
+
+		System.out.println("Variación teórica RAAN en 1 h = " + variacionRAAN + " grados");
+
+/////////////////////////		
+		// AHORA propagamos
+		AbsoluteDate fechaFinal = fechaInicial.shiftedBy(3600.0); // Propagamos
+
+		SpacecraftState estadoFinal = propagador.propagate(fechaFinal); // PROPAGANDO PROPAGANDO PROPAGANDO
+
 //		IMPRESION DEL RESULTADO FINAL
-					/* Órbita inicial
-					→ SpacecraftState
-					→ NumericalPropagator
-					   + Dormand-Prince
-					   + NewtonianAttraction
-					→ propagate(fechaFinal)
-					→ estadoFinal */
-		
+		/*
+		 * Órbita inicial → SpacecraftState → NumericalPropagator + Dormand-Prince +
+		 * NewtonianAttraction → propagate(fechaFinal) → estadoFinal
+		 */
+
 		double radioFinal = estadoFinal.getPosition().getNorm();
 
 		double velocidadFinal = estadoFinal.getPVCoordinates().getVelocity().getNorm();
 
 		System.out.println("Radio final = " + radioFinal / 1000.0 + " km");
 		System.out.println("Velocidad final = " + velocidadFinal / 1000.0 + " km/s");
-		
+
 //		COMPARACIÓN CON KEPLERIANA
-		KeplerianOrbit orbitaKepler1h =
-		        orbitaInicial.shiftedBy(600.0);
+		KeplerianOrbit orbitaKepler1h = orbitaInicial.shiftedBy(600.0);
 //		IMPRESION DE RESULTADO DE FORMA KEPLERIANA
 		double radioKepler1h = orbitaKepler1h.getPosition().getNorm();
 
@@ -115,11 +131,11 @@ public class Ejemplo29PropagacionRealista {
 		System.out.println("Diferencia de radio = " + (radioFinal - radioKepler1h) + " m");
 		System.out.println("Diferencia de velocidad = " + (velocidadFinal - velocidadKepler1h) + " m/s");
 //		
-		
+
 		double separacion = estadoFinal.getPosition().subtract(orbitaKepler1h.getPosition()).getNorm();
 
-		System.out.println("Separación entre posiciones = " + separacion + " m");			
-		
+		System.out.println("Separación entre posiciones = " + separacion + " m");
+
 		// COMPARACiÓN
 		KeplerianOrbit orbitaFinalJ2 = (KeplerianOrbit) OrbitType.KEPLERIAN.convertType(estadoFinal.getOrbit());
 		System.out.println();
@@ -133,6 +149,5 @@ public class Ejemplo29PropagacionRealista {
 		System.out.println("TA   = " + Math.toDegrees(orbitaFinalJ2.getTrueAnomaly()) + " grados");
 
 //      TRAYECTORIA PERTURBADA = UNA FAMILIA CONTINUA DE ORBITAS KEPLERIANAS OSCULATORIAS
-    }
-  }
-	
+	}
+}
