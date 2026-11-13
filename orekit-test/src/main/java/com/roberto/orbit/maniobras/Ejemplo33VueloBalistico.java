@@ -41,22 +41,26 @@ public class Ejemplo33VueloBalistico {
 		double pasoMaximo = 10.0;
 		double toleranciaAbsoluta = 1.0e-8;
 		double toleranciaRelativa = 1.0e-8;
+		
+		// ----------- PRIMERA FASE: VUELO PROPULSADO -----------
 
-		DormandPrince853Integrator integrador = new DormandPrince853Integrator(pasoMinimo, pasoMaximo,
-				toleranciaAbsoluta, toleranciaRelativa);
+		DormandPrince853Integrator integrador = new DormandPrince853Integrator(pasoMinimo, 
+				                                                               pasoMaximo,
+				                                                               toleranciaAbsoluta,
+				                                                               toleranciaRelativa);
 		// Sistema de ecuaciones diferenciales
 		EcuacionesCohete ecuaciones = new EcuacionesCohete();
-		ExpandableODE sistema = new ExpandableODE(ecuaciones);
+		ExpandableODE    sistema    = new ExpandableODE(ecuaciones);
 
 		// Tiempo final: agotamiento del combustible
 		double tiempoFinal = (MASA_INICIAL - MASA_SECA) * VE / EMPUJE;
 
 		// Integración numérica
 		ODEStateAndDerivative estadoFinal = integrador.integrate(sistema, estadoInicial, tiempoFinal);
-
-		// Recuperamos el estado final
+		
+		// Recuperamos el vector de estado final
 		double[] yf = estadoFinal.getPrimaryState();
-
+		
 		System.out.println("Tiempo final: " + estadoFinal.getTime() + " s");
 		System.out.println("Altura final: " + yf[0] / 1000.0 + " km");
 		System.out.println("Velocidad final: " + yf[1] + " m/s");
@@ -65,18 +69,14 @@ public class Ejemplo33VueloBalistico {
 		// ----------- SEGUNDA FASE: VUELO BALÍSTICO -----------
 
 		// Recuperamos el estado al apagar el motor
-		double[] estadoApagado = estadoFinal.getPrimaryState();
+		double[] estadoApagado = yf;
 
 		// Creamos el estado inicial de la segunda fase
 		ODEState estadoInicialBalistico = new ODEState(estadoFinal.getTime(), estadoApagado);
-
+		
 		// Definimos las ecuaciones del vuelo sin motor
 		EcuacionesVueloBalistico ecuacionesBalisticas = new EcuacionesVueloBalistico();
-		
-
-		
-
-		ExpandableODE sistemaBalistico = new ExpandableODE(ecuacionesBalisticas);
+		ExpandableODE            sistemaBalistico    = new ExpandableODE(ecuacionesBalisticas);
 
 		// Creamos otro integrador con las mismas tolerancias
 		DormandPrince853Integrator integradorBalistico = new DormandPrince853Integrator(pasoMinimo, pasoMaximo,
@@ -88,7 +88,7 @@ public class Ejemplo33VueloBalistico {
 			);
 		
 		
-		// Integramos provisionalmente otros 150 segundos
+		// Establecemos un límite de 300 segundos adicionales
 		double tiempoFinalBalistico = tiempoFinal + 300.0;
 
 		ODEStateAndDerivative estadoBalistico = integradorBalistico.integrate(sistemaBalistico, estadoInicialBalistico,
@@ -126,7 +126,9 @@ public class Ejemplo33VueloBalistico {
 			double dvdt = EMPUJE / m - MU / Math.pow(RT + h, 2); // F/m - mu/(Rt+ h)2
 			double dmdt = -EMPUJE / VE; // -F/ve
 
-			return new double[] { dhdt, dvdt, dmdt };
+//			return new double[] { dhdt, dvdt, dmdt };
+			double[] derivadas = { dhdt, dvdt, dmdt };
+			return derivadas;
 		}
 	}
 
@@ -148,43 +150,46 @@ public class Ejemplo33VueloBalistico {
 			double dvdt = -MU / Math.pow(RT + h, 2);
 			double dmdt = 0.0;
 
-			return new double[] { dhdt, dvdt, dmdt };
+//			return new double[] { dhdt, dvdt, dmdt };
+			double[] derivadas = { dhdt, dvdt, dmdt };
+			return derivadas;
+
 		}
 	}
+
 //	
-	private static class DetectorAlturaMaxima
-    implements ODEEventDetector {
+	private static class DetectorAlturaMaxima implements ODEEventDetector {
 
-	@Override
-	public AdaptableInterval getMaxCheckInterval() {
-		// TODO Auto-generated method stub
-		return state -> 10.0;
-	}
+		@Override
+		public AdaptableInterval getMaxCheckInterval() {
+			//
+			return state -> 10.0;
+		}
 
-	@Override
-	public int getMaxIterationCount() {
-		// TODO Auto-generated method stub
-		return 100;
-	}
+		@Override
+		public int getMaxIterationCount() {
+			//
+			return 100;
+		}
 
-	@Override
-	public BracketedUnivariateSolver<UnivariateFunction> getSolver() {
-		// TODO Auto-generated method stub
-		return new BracketingNthOrderBrentSolver(1.0e-6, 5);
-	}
+		@Override
+		public BracketedUnivariateSolver<UnivariateFunction> getSolver() {
+			//
+			return new BracketingNthOrderBrentSolver(1.0e-6, 5);
+		}
 
-	@Override
-	public ODEEventHandler getHandler() {
-	    return (state, detector, increasing) -> Action.STOP;
-	}
-	
-	@Override
-	public double g(ODEStateAndDerivative state) {
+		@Override
+		public ODEEventHandler getHandler() {
+			return (state, detector, increasing) -> Action.STOP;
+		}
 
-	    // La velocidad vertical es la segunda variable de estado
-	    double velocidad = state.getPrimaryState()[1];
+		@Override
+		public double g(ODEStateAndDerivative state) {
 
-	    return velocidad;
+			// La velocidad vertical es la segunda variable de estado
+			double velocidad = state.getPrimaryState()[1];
+
+			return velocidad;
 	}
 
 }
